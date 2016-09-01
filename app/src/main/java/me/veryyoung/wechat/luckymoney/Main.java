@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.widget.Button;
+import android.util.Log;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -43,6 +44,7 @@ public class Main implements IXposedHookLoadPackage {
 
     private static final String WECHAT_PACKAGE_NAME = "com.tencent.mm";
     private static final String LUCKY_MONEY_RECEIVE_UI_CLASS_NAME = "com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI";
+    private static final String TAG = "WechatLuckyMoney";
 
     private static String wechatVersion = "";
 
@@ -192,7 +194,7 @@ public class Main implements IXposedHookLoadPackage {
                 for (ApplicationInfo applicationInfo : applicationList) {
                     String packageName = applicationInfo.packageName;
                     if (isTarget(packageName)) {
-                        log("Hid package: " + packageName);
+                        Log.i(TAG, "Hid package: " + packageName);
                     } else {
                         resultapplicationList.add(applicationInfo);
                     }
@@ -209,7 +211,7 @@ public class Main implements IXposedHookLoadPackage {
                 for (PackageInfo packageInfo : packageInfoList) {
                     String packageName = packageInfo.packageName;
                     if (isTarget(packageName)) {
-                        log("Hid package: " + packageName);
+                        Log.i(TAG, "Hid package: " + packageName);
                     } else {
                         resultpackageInfoList.add(packageInfo);
                     }
@@ -223,7 +225,7 @@ public class Main implements IXposedHookLoadPackage {
                 String packageName = (String) param.args[0];
                 if (isTarget(packageName)) {
                     param.args[0] = WECHAT_PACKAGE_NAME;
-                    log("Fake package: " + packageName + " as " + WECHAT_PACKAGE_NAME);
+                    Log.i(TAG, "Fake package: " + packageName + " as " + WECHAT_PACKAGE_NAME);
                 }
             }
         });
@@ -233,7 +235,7 @@ public class Main implements IXposedHookLoadPackage {
                 String packageName = (String) param.args[0];
                 if (isTarget(packageName)) {
                     param.args[0] = WECHAT_PACKAGE_NAME;
-                    log("Fake package: " + packageName + " as " + WECHAT_PACKAGE_NAME);
+                    Log.i(TAG, "Fake package: " + packageName + " as " + WECHAT_PACKAGE_NAME);
                 }
             }
         });
@@ -246,7 +248,7 @@ public class Main implements IXposedHookLoadPackage {
                 for (RunningServiceInfo runningServiceInfo : serviceInfoList) {
                     String serviceName = runningServiceInfo.process;
                     if (isTarget(serviceName)) {
-                        log("Hid service: " + serviceName);
+                        Log.i(TAG, "Hid service: " + serviceName);
                     } else {
                         resultList.add(runningServiceInfo);
                     }
@@ -263,7 +265,7 @@ public class Main implements IXposedHookLoadPackage {
                 for (RunningTaskInfo runningTaskInfo : serviceInfoList) {
                     String taskName = runningTaskInfo.baseActivity.flattenToString();
                     if (isTarget(taskName)) {
-                        log("Hid task: " + taskName);
+                        Log.i(TAG, "Hid task: " + taskName);
                     } else {
                         resultList.add(runningTaskInfo);
                     }
@@ -280,7 +282,7 @@ public class Main implements IXposedHookLoadPackage {
                 for (RunningAppProcessInfo runningAppProcessInfo : runningAppProcessInfos) {
                     String processName = runningAppProcessInfo.processName;
                     if (isTarget(processName)) {
-                        log("Hid process: " + processName);
+                        Log.i(TAG, "Hid process: " + processName);
                     } else {
                         resultList.add(runningAppProcessInfo);
                     }
