@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.ActivityManager.RunningAppProcessInfo;
 import android.app.ActivityManager.RunningServiceInfo;
 import android.app.ActivityManager.RunningTaskInfo;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -42,9 +43,18 @@ public class Main implements IXposedHookLoadPackage {
     private static final String WECHAT_PACKAGE_NAME = "com.tencent.mm";
     private static final String LUCKY_MONEY_RECEIVE_UI_CLASS_NAME = "com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI";
 
+    private static String wechatVersion = "";
+
     @Override
-    public void handleLoadPackage(final LoadPackageParam lpparam) {
+    public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
         if (lpparam.packageName.equals(WECHAT_PACKAGE_NAME)) {
+            if (TextUtils.isEmpty(wechatVersion)) {
+                Context context = (Context) callMethod(callStaticMethod(findClass("android.app.ActivityThread", null), "currentActivityThread", new Object[0]), "getSystemContext", new Object[0]);
+                String versionName = context.getPackageManager().getPackageInfo(lpparam.packageName, 0).versionName;
+                log("Found wechat version:" + versionName);
+                wechatVersion = versionName;
+                VersionParam.init(versionName);
+            }
             findAndHookMethod("com.tencent.mm.ui.LauncherUI", lpparam.classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
@@ -71,7 +81,7 @@ public class Main implements IXposedHookLoadPackage {
                 }
             });
 
-            findAndHookMethod("com.tencent.mm.e.b.bj", lpparam.classLoader, "b", Cursor.class, new XC_MethodHook() {
+            findAndHookMethod("com.tencent.mm.e.b.bl", lpparam.classLoader, "b", Cursor.class, new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     if (!PreferencesUtils.open()) {
@@ -95,16 +105,21 @@ public class Main implements IXposedHookLoadPackage {
                             return;
                         }
 
+                        if (!isGroupTalk(talker) && isSend != 0) {
+                            return;
+                        }
+
                         if (isGroupTalk(talker) && PreferencesUtils.notMute()) {
-                            Object ai = callStaticMethod(findClass("com.tencent.mm.storage.ai", lpparam.classLoader), "E", param.thisObject);
-                            boolean notMute = (boolean) callStaticMethod(findClass("com.tencent.mm.booter.notification.c", lpparam.classLoader), "a", talker, ai, 3, false);
+                            Object msgInfo = callStaticMethod(findClass("com.tencent.mm.storage.ak", lpparam.classLoader), "F", param.thisObject);
+                            boolean notMute = (boolean) callStaticMethod(findClass("com.tencent.mm.booter.notification.c", lpparam.classLoader), "a", talker, msgInfo, 3, false);
                             if (!notMute) {
                                 return;
                             }
                         }
 
                         String content = getObjectField(param.thisObject, "field_content").toString();
-                        String nativeUrlString = getNativeUrl(content);
+
+                        String nativeUrlString = getFromXml(content, "nativeurl");
                         Uri nativeUrl = Uri.parse(nativeUrlString);
                         int msgType = Integer.parseInt(nativeUrl.getQueryParameter("msgtype"));
                         int channelId = Integer.parseInt(nativeUrl.getQueryParameter("channelid"));
@@ -112,23 +127,23 @@ public class Main implements IXposedHookLoadPackage {
                         final Object ab = newInstance(findClass("com.tencent.mm.plugin.luckymoney.c.ab", lpparam.classLoader),
                                 msgType, channelId, sendId, nativeUrlString, "", "", talker, "v1.0");
 
-                        int delayTime = 0;
-                        if (PreferencesUtils.delay()) {
-                            delayTime = PreferencesUtils.delayTime();
-                        }
-                        callMethod(callStaticMethod(findClass("com.tencent.mm.model.ah", lpparam.classLoader), "tF"), "a", ab, delayTime);
+
+                        int delayTime = PreferencesUtils.delay() ? PreferencesUtils.delayTime() : 0;
+
+                        callMethod(callStaticMethod(findClass("com.tencent.mm.model.ah", lpparam.classLoader), VersionParam.getNetworkByModelMethod), "a", ab, delayTime);
                     }
                 }
             });
 
 
-            findAndHookMethod(LUCKY_MONEY_RECEIVE_UI_CLASS_NAME, lpparam.classLoader, "d", int.class, int.class, String.class, "com.tencent.mm.t.j", new XC_MethodHook() {
+            findAndHookMethod(LUCKY_MONEY_RECEIVE_UI_CLASS_NAME, lpparam.classLoader, VersionParam.receiveUIFunctionName, int.class, int.class, String.class, VersionParam.receiveUIParamName, new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                    Button button = (Button) findFirstFieldByExactType(param.thisObject.getClass(), Button.class).get(param.thisObject);
-                    if (button.isShown() && button.isClickable()) {
-                        button.performClick();
-                        callMethod(param.thisObject, "finish");
+                    if (PreferencesUtils.quickOpen()) {
+                        Button button = (Button) findFirstFieldByExactType(param.thisObject.getClass(), Button.class).get(param.thisObject);
+                        if (button.isShown() && button.isClickable()) {
+                            button.performClick();
+                        }
                     }
                 }
             });
@@ -141,7 +156,7 @@ public class Main implements IXposedHookLoadPackage {
         return talker.endsWith("@chatroom");
     }
 
-    private String getNativeUrl(String xmlmsg) throws XmlPullParserException, IOException {
+    private String getFromXml(String xmlmsg, String node) throws XmlPullParserException, IOException {
         String xl = xmlmsg.substring(xmlmsg.indexOf("<msg>"));
         //nativeurl
         XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
@@ -149,18 +164,18 @@ public class Main implements IXposedHookLoadPackage {
         XmlPullParser pz = factory.newPullParser();
         pz.setInput(new StringReader(xl));
         int v = pz.getEventType();
-        String saveurl = "";
+        String result = "";
         while (v != XmlPullParser.END_DOCUMENT) {
             if (v == XmlPullParser.START_TAG) {
-                if (pz.getName().equals("nativeurl")) {
+                if (pz.getName().equals(node)) {
                     pz.nextToken();
-                    saveurl = pz.getText();
+                    result = pz.getText();
                     break;
                 }
             }
             v = pz.next();
         }
-        return saveurl;
+        return result;
     }
 
     private void hideModule(XC_LoadPackage.LoadPackageParam loadPackageParam) {
@@ -274,6 +289,5 @@ public class Main implements IXposedHookLoadPackage {
     private boolean isTarget(String name) {
         return name.contains("veryyoung") || name.contains("xposed");
     }
-
 
 }

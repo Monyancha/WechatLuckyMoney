@@ -38,6 +38,11 @@
             android:dependency="delay"
             android:title="@string/pref_delay_time" />
 
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="quick_open"
+            android:title="@string/quick_open" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/about">
@@ -51,9 +56,7 @@
         <Preference
             android:key="donate_wechat"
             android:title="@string/wechat_donate" />
-        <Preference
-            android:key="thanks"
-            android:title="@string/thanks" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>
